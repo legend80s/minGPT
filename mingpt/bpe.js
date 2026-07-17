@@ -6,17 +6,9 @@ import https from "node:https"
 import os from "node:os"
 import path from "node:path"
 import { pipeline } from "node:stream/promises"
-import {
-  chr,
-  concat,
-  minBy,
-  ord,
-  print,
-  range,
-  zip,
-} from "./python-patterns.js"
+import { chr, concat, minBy, ord, print, range, zip } from "./python-patterns.js"
 
-/** @import { int, IToken, ITokenId } from './bpe.type.js' */
+/** @import { char, int, IToken, ITokenId } from './bpe.type.js' */
 
 /** @typedef {Map<IToken, ITokenId>} TokenTable  */
 
@@ -88,9 +80,7 @@ class Encoder {
     // # print(f"{this.byte_encoder=}")
     // # raise TypeError("stop")
     /** @type {Map<string, number>} */
-    this.byte_decoder = new Map(
-      Array.from(this.byte_encoder, ([k, v]) => [v, k]),
-    )
+    this.byte_decoder = new Map(Array.from(this.byte_encoder, ([k, v]) => [v, k]))
     // for (const [k, v] of this.byte_encoder.entries()) {
     //     this.byte_decoder.set(v, k)
     // }
@@ -107,10 +97,8 @@ class Encoder {
     // #     ('i', 'n'): 3,
     // #     ...
     // # }
-    /** @type {Map<[char1: string, char2: string], int>} */
-    this.bpe_ranks = new Map(
-      Array.from(bpe_merges, (pair, index) => [pair, index]),
-    )
+    /** @type {Map<string, int>} */
+    this.bpe_ranks = new Map(Array.from(bpe_merges, (pair, index) => [this._makeKey(pair), index]))
     // # the splitting pattern used for pre-tokenization
     // # Should haved added re.IGNORECASE so BPE merges can happen for capitalized versions of contractions <-- original openai comment
     // """
@@ -130,8 +118,7 @@ class Encoder {
     // - we are special casing a few common apostrophe constructs ('s, 't, 're, ...) and making those into separate tokens
     // - we then separate out strings into consecutive chunks of 1) letters, 2) numbers, 3) non-letter-numbers, 4) whitespaces
     // """
-    this.pat =
-      /'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+/gu
+    this.pat = /'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+/gu
 
     /**
      * @type {Map<string, string>}
@@ -170,9 +157,10 @@ class Encoder {
         .join("")
       // console.log("token_translated:", token_translated)
       const token_merged = this.bpe(token_translated).split(" ")
-      const token_ix = token_merged.map((bpe_token) =>
-        this.encoder.get(bpe_token),
-      )
+
+      // console.log("token_translated:", token_translated, "→", token_merged)
+      // throw new Error("stop")
+      const token_ix = token_merged.map((bpe_token) => this.encoder.get(bpe_token))
       // @ts-expect-error
       bpe_idx.push(...token_ix)
       parts.push({
@@ -185,10 +173,18 @@ class Encoder {
     }
     const out = {
       bpe_idx: bpe_idx, // # the actual output sequence
-      tokens: tokens, // # result of pre-tokenization
-      parts: parts, // # intermediates for each token part
+      tokens, // # result of pre-tokenization
+      parts, // # intermediates for each token part
     }
     return out
+  }
+
+  /**
+   *
+   * @param {[char, char]} bigram
+   */
+  _makeKey(bigram) {
+    return String(bigram)
   }
 
   /**
@@ -204,6 +200,13 @@ class Encoder {
     // """
     // # token is a string of one individual 'word', after byte encoding, e.g. 'Ġthere'
 
+    // Hello 的合并路径
+    // ['l', 'l'] 获胜 word 从 ['H', 'e', 'l', 'l', 'o'] 变为 ['H', 'e', 'll', 'o']。
+    // ['e', 'll'] 获胜 word 变为 ['H', 'ell', 'o']。
+    // ['ell', 'o'] 获胜 word 变为 ['H', 'ello']
+    // ['H', 'ello'] 获胜 word 变为 ['Hello']
+    // 当 word 列表中只剩下一个元素时，说明整个单词已被合并为一个最终的token，合并循环结束。
+
     // # memoization, for efficiency
     if (this.cache.has(token)) {
       // @ts-expect-error
@@ -212,7 +215,7 @@ class Encoder {
 
     let word = tuple(token) // # individual characters that make up the token, in a tuple
     let pairs = get_pairs(word) // # get all bigrams
-    print("[bpe]", { token, word, pairs })
+    // print("[bpe]", { token, word, pairs })
 
     if (pairs.size === 0) {
       return token
@@ -220,14 +223,13 @@ class Encoder {
     while (true) {
       // # find the next lowest rank bigram that can be merged
       // findBestBigram
-      const bigram = minBy(
-        pairs,
-        (pair) => this.bpe_ranks.get(pair) ?? Infinity,
-      )
-      if (!bigram || !this.bpe_ranks.has(bigram)) {
+      const bestBigram = minBy(pairs, (pair) => this.bpe_ranks.get(this._makeKey(pair)) ?? Infinity)
+      // console.log("bigram:", bestBigram)
+      if (!bestBigram || !this.bpe_ranks.has(this._makeKey(bestBigram))) {
+        // console.log("BREAK")
         break // # no more bigrams are eligible to be merged
       }
-      const [first, second] = bigram
+      const [first, second] = bestBigram
 
       // # we will now replace all occurences of (first, second) in the list of current
       // # words into one merged token first_second, in the output list new_words
@@ -237,24 +239,31 @@ class Encoder {
       while (i < word.length) {
         // # find the next occurence of first in the sequence of current words
         try {
+          // word: [ 'H', 'e', 'l', 'l', 'o' ]
+          // first = 'H' second = 'e'
           const j = word.indexOf(first, i)
+          if (j === -1) {
+            const msg = `cannot find first in word starting at ${i}`
+            // console.log("msg:", msg)
+            throw new Error(msg)
+          }
+          // console.log("new_word1:", { i, j, new_word })
           new_word.push(...word.slice(i, j))
+          // console.log("new_word2:", new_word)
           i = j
         } catch {
           new_word.push(...word.slice(i))
           break
         }
         // # if this occurence is also followed by second, then merge them into one
-        if (
-          word[i] === first &&
-          i < word.length - 1 &&
-          word[i + 1] === second
-        ) {
+        if (word[i] === first && i < word.length - 1 && word[i + 1] === second) {
           new_word.push(first + second)
           i += 2
+          // console.log("new_word:", new_word, "i+2=", i)
         } else {
           // @ts-expect-error
           new_word.push(word[i])
+          // console.log("new_word:", new_word, "i+1=", i)
           i += 1
         }
       }
@@ -262,9 +271,11 @@ class Encoder {
       new_word = tuple(new_word)
       word = new_word
       if (word.length === 1) {
+        // console.log("break when word.length = 1")
         break
       } else {
         pairs = get_pairs(word)
+        // console.log("get_pairs another turn start:", { word, pairs })
       }
     }
 
@@ -298,10 +309,9 @@ function get_pairs(word) {
   // Return all bigrams as a set of tuples, of consecutive elements in the iterable word.
   // """
   const pairs = new Set()
-  let prev_char = word[0]
-  for (const char of word.slice(1)) {
-    pairs.add([prev_char, char])
-    prev_char = char
+
+  for (let i = 0; i < word.length - 1; i++) {
+    pairs.add([word[i], word[i + 1]])
   }
   return pairs
 }
@@ -332,9 +342,7 @@ async function get_file(local_file, remote_file) {
 
       // 检查状态码
       if (response.statusCode !== 200) {
-        reject(
-          new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`),
-        )
+        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`))
 
         return
       }
@@ -372,9 +380,7 @@ async function get_encoder() {
   await get_file(encoder_local_file, encoder_remote_file)
 
   /** @type {Map<IToken, ITokenId>} */
-  const encoder = new Map(
-    Object.entries(JSON.parse(readFileSync(encoder_local_file, "utf-8"))),
-  )
+  const encoder = new Map(Object.entries(JSON.parse(readFileSync(encoder_local_file, "utf-8"))))
   const keyCount = encoder.size
   // 256 individual byte tokens, 50,000 merged tokens, and 1 special <|endoftext|> token
   if (keyCount !== 50257) {
@@ -384,8 +390,7 @@ async function get_encoder() {
   // # load vocab.bpe that contains the bpe merges, i.e. the bpe tree structure
   // # in the form tuples (a, b), that indicate that (a, b) is to be merged to one token ab
   const vocab_local_file = path.join(cache_dir, "vocab.bpe")
-  const vocab_remote_file =
-    "https://openaipublic.blob.core.windows.net/gpt-2/models/124M/vocab.bpe"
+  const vocab_remote_file = "https://openaipublic.blob.core.windows.net/gpt-2/models/124M/vocab.bpe"
   await get_file(vocab_local_file, vocab_remote_file)
   const bpe_data = readFileSync(vocab_local_file, { encoding: "utf-8" })
 
@@ -418,30 +423,35 @@ async function get_encoder() {
 }
 
 if (import.meta.main) {
+  // test get_pairs
+  const word = ["H", "e", "l", "l", "o"]
+  const expected_pairs = new Set([
+    ["H", "e"],
+    ["e", "l"],
+    ["l", "o"],
+    ["l", "l"],
+  ])
+  const actual_pairs = get_pairs(word)
+  console.log("actual_pairs:", actual_pairs)
+  assert.deepStrictEqual(actual_pairs, expected_pairs)
+
   // # here is an encoding example
   const text = "Hello!! I'm Andrej Karpathy. It's 2022. w00t :D 🤗"
   const e = await get_encoder()
   const r = e.encode_and_show_work(text)
   print("Original text is:")
   print(text)
-  print(
-    "First the text gets pre-tokenized, broken up into chunks, the outcome is:",
-  )
-  print(r["tokens"]?.length, r["tokens"])
-  // # ['Hello', '!!', ' I', "'m", ' Andrej', ' Karpathy', '.', ' It', "'s", ' 2022', '.', ' w', '00', 't', ' :', 'D', ' 🤗']
-  print(
-    "Then we iterate over each chunk and process them in turn...",
-    r["parts"].length,
-  )
 
-  assert(
-    r.tokens?.length === 17 && r["parts"].length === 17,
-    "Expected 17 tokens and 17 parts, but got " +
-      r.tokens?.length +
-      " tokens and " +
-      r["parts"].length +
-      " parts",
-  )
+  print("First the text gets pre-tokenized, broken up into chunks, the outcome is:")
+  print("tokens", r["tokens"]?.length, r["tokens"])
+  // # ['Hello', '!!', ' I', "'m", ' Andrej', ' Karpathy', '.', ' It', "'s", ' 2022', '.', ' w', '00', 't', ' :', 'D', ' 🤗']
+  print("Then we iterate over each chunk and process them in turn...")
+
+  assert(r.tokens?.length === 17 && r["parts"].length === 17, "Expected 17 tokens and 17 parts")
+
+  // biome-ignore format: keep one line for easy visual comparison
+  assert.deepStrictEqual(r.tokens, ['Hello', '!!', ' I', "'m", ' Andrej', ' Karpathy', '.', ' It', "'s", ' 2022', '.', ' w', '00', 't', ' :', 'D', ' 🤗'])
+  print("parts:", r["parts"].length)
   for (const part of r["parts"]) {
     print(part)
   }
@@ -463,10 +473,12 @@ if (import.meta.main) {
   // # {'token': 'D', 'token_bytes': b'D', 'token_translated': 'D', 'token_merged': ['D'], 'token_ix': [35]}
   // # {'token': ' 🤗', 'token_bytes': b' \xf0\x9f\xa4\x97', 'token_translated': 'ĠðŁ¤Ĺ', 'token_merged': ['ĠðŁ', '¤', 'Ĺ'], 'token_ix': [12520, 97, 245]}
   // # (refer to the code inside Encoder.encode for what these intermediates are)
-  print(
-    "and the final outcome is concatenating and flattening all the token_ix:",
-  )
-  print(r["bpe_idx"])
+  print("and the final outcome is concatenating and flattening all the token_ix:")
+
+  print(r.bpe_idx.length, r.bpe_idx)
+  assert(r.bpe_idx.length === 22)
+  // biome-ignore format: one line
+  assert.deepStrictEqual(r.bpe_idx, [15496, 3228, 314, 1101, 10948, 73, 509, 5117, 10036, 13, 632, 338, 33160, 13, 266, 405, 83, 1058, 35, 12520, 97, 245])
   // # [15496, 3228, 314, 1101, 10948, 73, 509, 5117, 10036, 13, 632, 338, 33160, 13, 266, 405, 83, 1058, 35, 12520, 97, 245]
   // # this would then become the integer input sequence to the transformer
   print("ready to feed into a Transformer!")

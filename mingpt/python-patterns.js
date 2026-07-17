@@ -1,11 +1,43 @@
 /** @import { int, IToken, ITokenId } from './bpe.type.js' */
 
+import { Console } from "node:console"
+
 /**
  *
  * @param  {...unknown} args
  */
 export function print(...args) {
-  console.log(...args)
+  const oneLineConsole = new Console({
+    stdout: process.stdout,
+    stderr: process.stderr,
+
+    inspectOptions: { breakLength: Infinity, compact: true },
+  })
+
+  oneLineConsole.log(...args)
+}
+
+if (import.meta.main) {
+  // should print on one line, just like Python `print` does
+  print([
+    "Hello",
+    "!!",
+    " I",
+    "'m",
+    " Andrej",
+    " Karpathy",
+    ".",
+    " It",
+    "'s",
+    " 2022",
+    ".",
+    " w",
+    "00",
+    "t",
+    " :",
+    "D",
+    " 🤗",
+  ])
 }
 
 /**
@@ -97,6 +129,7 @@ export function minBy(set, fn) {
   const iterator = set.values()
   let min = iterator.next().value
   for (const item of iterator) {
+    // console.log(item, "→", fn(item), min, "→", fn(min))
     // @ts-expect-error
     if (fn(item) < fn(min)) {
       min = item

@@ -104,7 +104,7 @@ class Encoder:
         )
         self.cache = {}
 
-    def bpe(self, token: str):
+    def bpe(self, token: str) -> str:
         """
         this function uses self.bpe_ranks to iteratively merge all the possible bpe tokens
         up the tree. token is a string of one individual 'word' (after regex tokenization)
@@ -335,7 +335,7 @@ if __name__ == "__main__":
     # {'token': ' 🤗', 'token_bytes': b' \xf0\x9f\xa4\x97', 'token_translated': 'ĠðŁ¤Ĺ', 'token_merged': ['ĠðŁ', '¤', 'Ĺ'], 'token_ix': [12520, 97, 245]}
     # (refer to the code inside Encoder.encode for what these intermediates are)
     print("and the final outcome is concatenating and flattening all the token_ix:")
-    print(r["bpe_idx"])
+    print(len(r["bpe_idx"]), r["bpe_idx"])
     # [15496, 3228, 314, 1101, 10948, 73, 509, 5117, 10036, 13, 632, 338, 33160, 13, 266, 405, 83, 1058, 35, 12520, 97, 245]
     # this would then become the integer input sequence to the transformer
     print("ready to feed into a Transformer!")

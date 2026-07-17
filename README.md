@@ -1,11 +1,13 @@
 
-# minGPT
+<h1 align="center">minGPT</h1>
 
 <p align="center">
   <img src="./assets/banner.svg" alt="minGPT: Forked from karpathy/minGPT but in Node.js: A minimal PyTorch re-implementation of the OpenAI GPT (Generative Pretrained Transformer) training" width="700" />
 </p>
 
 > Forked from karpathy/minGPT but in Node.js: A minimal PyTorch re-implementation of the OpenAI GPT (Generative Pretrained Transformer) training.
+> 
+> Correct some output comments.
 
 ![mingpt](mingpt.jpg)
 

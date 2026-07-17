@@ -23,3 +23,17 @@ Then we iterate over each chunk and process them in turn...
 and the final outcome is concatenating and flattening all the token_ix:
 [15496, 3228, 314, 1101, 10948, 73, 509, 5117, 10036, 13, 632, 338, 33160, 13, 266, 405, 83, 1058, 35, 12520, 97, 245]
 ready to feed into a Transformer!
+
+
+// Hello 的合并路径
+// ['l', 'l'] 获胜 word 从 ['H', 'e', 'l', 'l', 'o'] 变为 ['H', 'e', 'll', 'o']。
+// ['e', 'll'] 获胜 word 变为 ['H', 'ell', 'o']。
+// ['ell', 'o'] 获胜 word 变为 ['H', 'ello']
+// ['H', 'ello'] 获胜 word 变为 ['Hello']
+// 当 word 列表中只剩下一个元素时，说明整个单词已被合并为一个最终的token，合并循环结束。
+
+hello 的合并路径
+1. bigram: [ 'h', 'e' ]   word: [ 'he', 'l', 'l', 'o' ]
+2. bigram: [ 'l', 'l' ]  word: [ 'he', 'll', 'o' ],
+3. bigram: [ 'he', 'll' ] word: [ 'hell', 'o' ]
+4. bigram: [ 'hell', 'o' ] new_word: [ 'hello' ]
