@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 200" fill="none">
+  <rect width="900" height="200" rx="12" fill="#0d1117"/>
+  <defs>
+    <radialGradient id="grad2" cx="30%" cy="50%" r="70%" fx="25%" fy="50%">
+      <stop offset="0%" stop-color="#ffd86f"></stop>
+      <stop offset="35%" stop-color="#ff9a56"></stop>
+      <stop offset="70%" stop-color="#f55f5f"></stop>
+      <stop offset="100%" stop-color="#b83b7a"></stop>
+    </radialGradient>
+    <linearGradient id="grad3" x1="0%" y1="20%" x2="100%" y2="80%">
+      <stop offset="0%" stop-color="#7ae0ff"></stop>
+      <stop offset="40%" stop-color="#3cb9ff"></stop>
+      <stop offset="70%" stop-color="#5f8aff"></stop>
+      <stop offset="100%" stop-color="#a37eff"></stop>
+    </linearGradient>
+  </defs>
+  <text x="450" y="90" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="62" font-weight="700" fill="url(#grad2)">minGPT in modern Node.js</text>
+  <text x="450" y="140" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="url(#grad3)">minGPT but in Node.js: A minimal PyTorch re-implementation of the OpenAI GPT training</text>
+  <line x1="250" y1="170" x2="550" y2="170" stroke="#30363d" stroke-width="1"/>
+</svg>
